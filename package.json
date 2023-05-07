@@ -1,6 +1,6 @@
 {
   "name": "drizzle-auth-adaptor-pg",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "dependencies": {
     "drizzle-orm": "^0.25.4",
     "uuid": "^9.0.0"
