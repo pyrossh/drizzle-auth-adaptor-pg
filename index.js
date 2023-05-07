@@ -1,6 +1,7 @@
 import { integer, timestamp, pgTable, text, primaryKey } from 'drizzle-orm/pg-core';
-import { accounts, users, sessions, verificationTokens } from './schema'
-import { and, eq } from 'drizzle-orm/expressions'
+import { accounts, users, sessions, verificationTokens } from './schema';
+import { and, eq } from 'drizzle-orm/expressions';
+import uuid from 'uuid';
 
 export const users = pgTable('users', {
   id: text('id').notNull().primaryKey(),
@@ -23,7 +24,7 @@ export const accounts = pgTable("accounts", {
   id_token: text("id_token"),
   session_state: text("session_state"),
 }, (account) => ({
-  nameDoesntMatter: primaryKey(account.provider, account.providerAccountId)
+  compoundKey: primaryKey(account.provider, account.providerAccountId)
 }))
 
 export const sessions = pgTable("sessions", {
@@ -37,58 +38,56 @@ export const verificationTokens = pgTable("verificationToken", {
   token: text("token").notNull(),
   expires: timestamp("expires", { mode: "date" }).notNull()
 }, (vt) => ({
-  nameDoesntMatter: primaryKey(vt.identifier, vt.token)
+  compoundKey: primaryKey(vt.identifier, vt.token)
 }))
 
 /** @param {import("drizzle-orm/postgres-js").PostgresJsDatabase} [db] */
 export default function DrizzleAuthAdapterPG(db) {
   return {
     createUser: async (data) => {
-      return db
+      return client
         .insert(users)
-        .values(data)
+        .values({ ...data, id: uuid() })
         .returning()
         .then(res => res[0])
     },
     getUser: async (data) => {
-      return db
+      return client
         .select()
         .from(users)
         .where(eq(users.id, data))
-        .then(res => res[0])
-        ?? null
+        .then(res => res[0] || null)
     },
     getUserByEmail: async (data) => {
-      return db
+      return client
         .select()
         .from(users)
         .where(eq(users.email, data))
-        .then(res => res[0])
-        ?? null
+        .then(res => res[0] || null)
     },
     createSession: async (data) => {
-      return db
+      return client
         .insert(sessions)
         .values(data)
         .returning()
         .then(res => res[0])
     },
     getSessionAndUser: async (data) => {
-      return db.select({
+      return client.select({
         session: sessions,
         user: users
       })
         .from(sessions)
         .where(eq(sessions.sessionToken, data))
         .innerJoin(users, eq(users.id, sessions.userId))
-        .then(res => res[0])
-        ?? null
+        .then(res => res[0] || null)
     },
     updateUser: async (data) => {
       if (!data.id) {
         throw new Error("No user id.")
       }
-      return db
+
+      return client
         .update(users)
         .set(data)
         .where(eq(users.id, data.id))
@@ -96,7 +95,7 @@ export default function DrizzleAuthAdapterPG(db) {
         .then(res => res[0])
     },
     updateSession: async (data) => {
-      return db
+      return client
         .update(sessions)
         .set(data)
         .where(eq(sessions.sessionToken, data.sessionToken))
@@ -104,11 +103,14 @@ export default function DrizzleAuthAdapterPG(db) {
         .then(res => res[0])
     },
     linkAccount: async (rawAccount) => {
-      const updatedAccount = await db
+      const updatedAccount = await client
         .insert(accounts)
         .values(rawAccount)
         .returning()
         .then(res => res[0])
+
+      // Drizzle will return `null` for fields that are not defined.
+      // However, the return type is expecting `undefined`.
       const account = {
         ...updatedAccount,
         access_token: updatedAccount.access_token ?? undefined,
@@ -119,16 +121,11 @@ export default function DrizzleAuthAdapterPG(db) {
         expires_at: updatedAccount.expires_at ?? undefined,
         session_state: updatedAccount.session_state ?? undefined
       }
+
       return account
     },
     getUserByAccount: async (account) => {
-      return db.select({
-        id: users.id,
-        email: users.email,
-        emailVerified: users.emailVerified,
-        image: users.image,
-        name: users.name
-      })
+      const user = await client.select()
         .from(users)
         .innerJoin(accounts, (
           and(
@@ -138,16 +135,17 @@ export default function DrizzleAuthAdapterPG(db) {
         ))
         .then(res => res[0])
         ?? null
-    }
-    ,
+
+      return user.users
+    },
     deleteSession: async (sessionToken) => {
-      await db
+      await client
         .delete(sessions)
         .where(eq(sessions.sessionToken, sessionToken))
 
     },
     createVerificationToken: async (token) => {
-      return db
+      return client
         .insert(verificationTokens)
         .values(token)
         .returning()
@@ -155,7 +153,7 @@ export default function DrizzleAuthAdapterPG(db) {
     },
     useVerificationToken: async (token) => {
       try {
-        return db
+        return client
           .delete(verificationTokens)
           .where(
             and(
@@ -172,14 +170,14 @@ export default function DrizzleAuthAdapterPG(db) {
       }
     },
     deleteUser: async (id) => {
-      await db
+      await client
         .delete(users)
         .where(eq(users.id, id))
         .returning()
         .then(res => res[0])
     },
     unlinkAccount: async (account) => {
-      await db.delete(accounts)
+      await client.delete(accounts)
         .where(
           and(
             eq(accounts.providerAccountId, account.providerAccountId),
