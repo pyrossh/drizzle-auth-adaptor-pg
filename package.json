@@ -1,0 +1,7 @@
+{
+  "name": "drizzle-auth-adaptor-pg",
+  "version": "0.0.1",
+  "dependencies": {
+    "drizzle-orm": "^0.25.4"
+  }
+}
