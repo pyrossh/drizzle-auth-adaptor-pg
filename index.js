@@ -1,6 +1,6 @@
 import { integer, timestamp, pgTable, text, primaryKey } from 'drizzle-orm/pg-core';
 import { accounts, users, sessions, verificationTokens } from './schema';
-import { and, eq } from 'drizzle-orm/expressions';
+import { and, eq } from 'drizzle-orm';
 import uuid from 'uuid';
 
 export const users = pgTable('users', {

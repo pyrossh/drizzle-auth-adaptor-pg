@@ -5,7 +5,7 @@ Drizzle orm adaptor for next-auth/authjs (postgres version)
 ```js
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import DrizzleAuthAdapterPG from "drizzle-authjs-adaptor-pg";
+import DrizzleAuthAdapterPG from "drizzle-auth-adaptor-pg";
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { Pool } from "@neondatabase/serverless";
 
